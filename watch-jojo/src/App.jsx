@@ -250,6 +250,12 @@ export default function App() {
   const trailIdRef = useRef(0);
   const comboTimeoutRef = useRef(null);
 
+  // Audio source respects Vite base URL (works when site is deployed to subpath)
+  const audioSrc = (() => {
+    const base = import.meta.env.BASE_URL || '/';
+    return base.endsWith('/') ? base + 'jojo.mp3' : base + '/jojo.mp3';
+  })();
+
   // ── Start
   const handleStart = useCallback(async () => {
     setStarted(true);
@@ -515,9 +521,29 @@ export default function App() {
     };
   }, []);
 
+  // Verify audio file exists on the deployed base URL (helps catch 404/CORS)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(audioSrc, { method: 'HEAD' });
+        if (!cancelled && !res.ok) {
+          console.warn('Audio HEAD check failed', res.status);
+          setToast('Audio file not found on server (404).');
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Audio HEAD check error', err);
+          setToast('Audio load error (network or CORS).');
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [audioSrc]);
+
   return (
     <>
-      <audio ref={audioRef} src="/jojo.mp3" loop preload="auto" />
+      <audio ref={audioRef} src={audioSrc} loop preload="auto" />
 
       {/* Canvas always under */}
       <div className="canvas-container" onClick={handleClick}>
