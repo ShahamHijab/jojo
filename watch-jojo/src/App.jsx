@@ -254,7 +254,13 @@ export default function App() {
   const handleStart = useCallback(async () => {
     setStarted(true);
     if (audioRef.current) {
-      try { await audioRef.current.play(); setPlaying(true); } catch(_) {}
+      try {
+        await audioRef.current.play();
+        setPlaying(true);
+      } catch (err) {
+        console.error('Audio play failed on start:', err);
+        setToast('Audio blocked — tap the music button to enable.');
+      }
     }
     if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") {
       try { const p = await DeviceOrientationEvent.requestPermission(); if (p==="granted") setHasGyro(true); } catch(_) {}
@@ -475,9 +481,39 @@ export default function App() {
   const toggleMusic = useCallback(async (e) => {
     e.stopPropagation();
     if (!audioRef.current) return;
-    if (playing) { audioRef.current.pause(); setPlaying(false); }
-    else { await audioRef.current.play(); setPlaying(true); }
+    try {
+      if (playing) {
+        audioRef.current.pause();
+        setPlaying(false);
+      } else {
+        await audioRef.current.play();
+        setPlaying(true);
+      }
+    } catch (err) {
+      console.error('toggleMusic play error:', err);
+      setToast('Unable to play audio. Click to retry.');
+    }
   }, [playing]);
+
+  // Expose audio event handlers to surface errors and update UI
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a) return;
+    const onError = () => {
+      console.error('Audio element error', a.error);
+      setToast('Audio failed to load or play. Check the file or retry.');
+    };
+    const onPlay = () => setPlaying(true);
+    const onPause = () => setPlaying(false);
+    a.addEventListener('error', onError);
+    a.addEventListener('play', onPlay);
+    a.addEventListener('pause', onPause);
+    return () => {
+      a.removeEventListener('error', onError);
+      a.removeEventListener('play', onPlay);
+      a.removeEventListener('pause', onPause);
+    };
+  }, []);
 
   return (
     <>
